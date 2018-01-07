@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shang Sunburst</title>
+    <meta charset="utf-8" http-equiv="X-UA-Compatible" content="IE=9" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js" charset="utf-8"></script>
+
+<style>
+  div.tooltip {
+  position: absolute;
+  text-align: left;
+  width: auto;
+  height: auto;
+  padding: 8px;
+  font: 12px arial;
+  background: #0a2538;
+  border: #0a2538 1px solid;
+  border-radius: 0px;
+  pointer-events: none;
+  color: white;
+}
+
+body{
+    font-family: Arial;
+    color: #0a2538;
+}
+</style>     
+
+</head>
+
+<body>
+
+  <h1>Shang's Sunburst Plotter</h1>
+
+  <div><strong>Upload csv: </strong><input type="file" id="csvFileInput" onchange="handleFiles(this.files)"
+      accept=".csv">
+  <output id="list"></output></div>
+
+  <div id= 'checkboxes'><strong>Select Category Columns:</strong></div>
+
+  <div id='dropdown'><strong>Select Value: </strong><select id='valueSelect' onchange = 'changeValueCol()'></select></div>
+
+  <button onclick = 'plotSunburst()'>Plot Sunburst</button>
+
+  <div id='graph'></div>
+  
+  <script>
+
+  function precisionRound(number, precision) {
+    var factor = Math.pow(10, precision);
+    return Math.round(number * factor) / factor;
+  }
+
+  var cols; 
+
+  var valueCol;
+
+  function changeValueCol(){
+
+      valueCol = cols[document.getElementById('valueSelect').selectedIndex]
+
+  }
+
+  function plotSunburst(){
+
+    var margin = {
+      top: 20,
+      right: 20,
+      bottom: 20,
+      left: 20
+    };
+
+    var w = 500 - margin.left - margin.right,
+      h = 500 - margin.top - margin.bottom,
+      radius = (Math.min(w, h) / 2) - 10;
+
+    var formatNumber = d3.format(",d");
+
+    color = d3.scale.category10();
+
+    var x = d3.scale.linear()
+      .range([0, 2 * Math.PI]);
+
+    var y = d3.scale.linear()
+      .range([0, radius]);
+
+    var partition = d3.layout.partition()
+      .children(function(d) {
+          return Array.isArray(d.values) ?
+              d.values : null;
+      })
+      .value(function(d) {
+          return d.values;
+      });
+    
+      d3.select("#graph").html('')
+
+    // responsive svg
+    var svg = d3.select("#graph").append("svg")
+      .attr("width", w)
+      .attr("height", h)
+      .append("g")
+      .attr("transform", "translate(" + w / 2 + "," + h / 2 + ")");
+
+    var arc = d3.svg.arc()
+      .startAngle(function(d) {
+        return Math.max(0, Math.min(2 * Math.PI, x(d.x)));
+      })
+      .endAngle(function(d) {
+        return Math.max(0, Math.min(2 * Math.PI, x(d.x + d.dx)));
+      })
+      .innerRadius(function(d) {
+        return Math.max(0, y(d.y));
+      })
+      .outerRadius(function(d) {
+        return Math.max(0, y(d.y + d.dy));
+      });
+
+
+    // tooltip
+    var tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
+
+      hierarchy = {
+            key: "",
+            values: d3.nest()
+      }
+
+      for(let i=0;i<sortCols.length;i++){
+
+            hierarchy.values = hierarchy.values.key(function(d){ return d[sortCols[i]]})
+
+      }
+
+      hierarchy.values = hierarchy.values.rollup(function(d){ return (d3.sum(d,function(v){return v[valueCol]}))})
+                            .entries(data)
+
+
+      hData = partition.nodes(hierarchy);
+
+      var g = svg.selectAll("path")
+        .data(partition.nodes(hierarchy))
+        .enter().append("g");
+
+      var path = g.append("path")
+        .attr("d", arc)
+        .style("fill", function(d) {
+          return color(d.key);
+        })
+        .style("stroke", "white")
+        .style("stroke-width", "1px")
+        .on("click", click)
+        .on("mouseover", function(d, i) {
+          d3.select(this).style("cursor", "pointer")
+          var percentage = precisionRound((100 * d.value / totalSize),1);
+          var percentageString = percentage + "%";
+          //if (d.key == "Syndicate") return null;
+
+        tooltip.html(sortCols[d.depth-1] + ':' + d.key + "<br/>" + Math.round(d.value) +"<br/>"+ percentageString)
+            .style("opacity", 0.8)
+            .style("left", (d3.event.pageX) + 0 + "px")
+            .style("top", (d3.event.pageY) - 0 + "px");
+        })
+        .on("mouseout", function(d) {
+          d3.select(this).style("cursor", "default")
+          tooltip.style("opacity", 0);
+        });
+      
+      var totalSize = path.node().__data__.value;
+
+
+      var text = g.append("text")
+        .attr("transform", function(d) {
+          return "translate(" + arc.centroid(d) + ")rotate(" + computeTextRotation(d) + ")";
+        })
+        .attr("text-anchor", "middle")
+        .attr("dx", "0") // margin
+        .attr("dy", ".35em") // vertical-align
+        .text(function(d) {
+
+          var percentage = Math.round((100 * d.value / totalSize));
+
+          if(percentage >= 100 | percentage < 2){return ''}
+
+          return d.key
+        
+        })
+        .style("font-size", "13px")
+        .style("fill", "#0a2538");
+
+
+      function click(d) {
+        
+        totalSize =  d.value;
+
+        text.text(function(d) {
+
+          var percentage = Math.round((100 * d.value / totalSize));
+
+          if(percentage > 100 | percentage < 2){return ''}
+
+          return d.key
+        
+        })
+
+        // fade out all text elements
+        text.transition().attr("opacity", 0);
+
+        path.transition()
+          .duration(750)
+          .attrTween("d", arcTween(d))
+          .each("end", function(e, i) {
+            // check if the animated element's data e lies within the visible angle span given in d
+            if (e.x >= d.x && e.x < (d.x + d.dx)) {
+              // get a selection of the associated text element
+              var arcText = d3.select(this.parentNode).select("text");
+              // fade in the text element and recalculate positions
+              arcText.transition().duration(750)
+                .attr("opacity", 1)
+                .attr("transform", function(d) {
+                  return "translate(" + arc.centroid(d) + ")rotate(" + computeTextRotation(d) + ")";
+                })
+                .attr("text-anchor", "middle");
+            }
+          });
+      }
+
+      // Interpolate the scales!
+      function arcTween(d) {
+        var xd = d3.interpolate(x.domain(), [d.x, d.x + d.dx]),
+          yd = d3.interpolate(y.domain(), [d.y, 1]),
+          yr = d3.interpolate(y.range(), [d.y ? 20 : 0, radius]);
+        return function(d, i) {
+          return i ? function(t) {
+            return arc(d);
+          } : function(t) {
+            x.domain(xd(t));
+            y.domain(yd(t)).range(yr(t));
+            return arc(d);
+          };
+        };
+      }
+
+      function computeTextRotation(d) {
+        var ang = (x(d.x + d.dx / 2) - Math.PI / 2) / Math.PI * 180;
+        return (ang > 90) ? 180 + ang : ang;
+      }
+
+
+
+
+
+
+
+  }
+
+  
+
+  function handleFiles(files) {
+    
+    var file = files[0]; // FileList object
+
+    var reader = new FileReader();
+
+    reader.onload = function(e){
+
+      data = e.target.result
+
+        //Parse into array of row objects
+        data = d3.csv.parse(data);
+
+        cols = Object.keys(data[0])
+
+        sortCols = [];
+        
+        for(let i=0;i<cols.length;i++){
+
+          var checkbox = document.createElement('input');
+          checkbox.type = "checkbox";
+          checkbox.name = cols[i];
+          checkbox.value = false;
+          checkbox.id = cols[i];
+
+          var label = document.createElement('label')
+          label.htmlFor = "id";
+          label.appendChild(document.createTextNode(checkbox.name));
+
+          document.getElementById('checkboxes').appendChild(checkbox)
+          document.getElementById('checkboxes').appendChild(label)
+
+          checkbox.addEventListener('change', function() {
+              if(this.checked) {
+                  // Checkbox is checked..
+                  sortCols.push(cols[i])
+
+              } else {
+                  // Checkbox is not checked..
+                  sortCols = sortCols.filter(function(p){return !(p==cols[i])})
+              }
+          });
+
+          var option = document.createElement('option')
+          option.value = cols[i];
+          option.label = cols[i];
+
+          document.getElementById('valueSelect').appendChild(option)
+
+
+        }
+
+        
+      }     
+
+    reader.readAsText(file)
+
+    // files is a FileList of File objects. List some properties.
+    var output = [];
+
+        output.push('<li><strong>', escape(file.name), '</strong></li>')
+    
+    document.getElementById('list').innerHTML = '<ul>' + output.join('') + '</ul>';
+    
+}
+  </script>
+</body>
+
