@@ -130,8 +130,7 @@ body{
 
       for(let i=0;i<sortCols.length;i++){
 
-            hierarchy.values = hierarchy.values.key(function(d){ return d[sortCols[i]]})
-
+            hierarchy.values = hierarchy.values.key(function(d){ return d[sortCols[i]]});
       }
 
       hierarchy.values = hierarchy.values.rollup(function(d){ return (d3.sum(d,function(v){return v[valueCol]}))})
@@ -158,8 +157,8 @@ body{
           var percentageString = percentage + "%";
           //if (d.key == "Syndicate") return null;
 
-        tooltip.html(sortCols[d.depth-1] + ':' + d.key + "<br/>" + Math.round(d.value) +"<br/>"+ percentageString)
-            .style("opacity", 0.8)
+        tooltip.html(sortCols[d.depth-1] + ': ' + d.key + "<br/>" + valueCol + ": " + Math.round(d.value).toLocaleString() +"<br/>"+ percentageString)
+            .style("opacity", d.depth-1 >= 0 ? 0.8 : 0)
             .style("left", (d3.event.pageX) + 0 + "px")
             .style("top", (d3.event.pageY) - 0 + "px");
         })
@@ -184,10 +183,10 @@ body{
 
           if(percentage >= 100 | percentage < 2){return ''}
 
-          return d.key
+          return d.key.substring(0, 8)
         
         })
-        .style("font-size", "13px")
+        .style("font-size", "9px")
         .style("fill", "#0a2538");
 
 
@@ -201,7 +200,7 @@ body{
 
           if(percentage > 100 | percentage < 2){return ''}
 
-          return d.key
+          return d.key.substring(0, 8)
         
         })
 
@@ -305,8 +304,7 @@ body{
           option.value = cols[i];
           option.label = cols[i];
 
-          document.getElementById('valueSelect').appendChild(option)
-
+          document.getElementById('valueSelect').appendChild(option);
 
         }
 
